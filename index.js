@@ -1,10 +1,11 @@
-global.crypto = require('crypto'); // CRITICAL FIX FOR RENDER NODE 24
+global.crypto = require('crypto'); // RENDER FIX
 
 const express = require('express');
 const { 
     default: makeWASocket, 
     DisconnectReason, 
-    useMultiFileAuthState
+    useMultiFileAuthState,
+    Browsers
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const QRCode = require('qrcode');
@@ -12,44 +13,49 @@ const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const BOT_NAME = 'EZED XMD V1.2';
-const OWNER = '254769532338@s.whatsapp.net'; // <-- CHANGE TO YOUR NUMBER WITH 254
+const BOT_NAME = 'EZED XMD V1.3';
+const OWNER = '254769532338@s.whatsapp.net'; // CHANGE ME
 const AUTH = 'auth';
 
-// V1 RULE: Always delete old session on Render to force new QR
+// INSTANT QR TRICK: Delete auth + start bot immediately on boot
 if (fs.existsSync(AUTH)) fs.rmSync(AUTH, { recursive: true, force: true });
+console.log('🗑️ Auth deleted. Forcing new QR...');
 
 let QR = null;
+let QR_READY = false;
 let sock;
 
 app.get('/', async (req, res) => {
-    if (!QR) return res.send(`
-        <div style="text-align:center;padding:50px;background:#000;color:#00ff88;font-family:sans-serif;">
+    if (!QR_READY) return res.send(`
         <h1>⚡ ${BOT_NAME} ⚡</h1>
-        <h2>Waiting QR...</h2>
-        <p>Refresh this page in 10s</p>
-        <meta http-equiv="refresh" content="10">
-        </div>
+        <h2>Generating QR... wait 3s</h2>
+        <script>setTimeout(()=>location.reload(),3000)</script>
     `);
     const img = await QRCode.toDataURL(QR);
     res.send(`
-        <div style="text-align:center;padding:40px;background:#000;color:#00ff88;font-family:sans-serif;">
-        <h1>⚡ Scan ${BOT_NAME} ⚡</h1>
-        <img src="${img}" width="320" style="border:4px solid #00ff88;border-radius:20px;"/>
-        <p>WhatsApp > Settings > Linked Devices > Link a Device</p>
+        <div style="text-align:center;padding:20px;background:#000;color:#00ff88;">
+        <h1>⚡ Scan NOW - Expires in 60s ⚡</h1>
+        <img src="${img}" width="350" style="border:5px solid #00ff88;border-radius:20px;"/>
+        <p>WhatsApp > Linked Devices > Link a Device</p>
         </div>
     `);
 });
-app.listen(PORT, () => console.log(`✅ Web: ${PORT}`));
+app.listen(PORT);
+
+// KEEP ALIVE PING - Stops Render from sleeping during QR
+setInterval(() => { 
+    fetch(`http://localhost:${PORT}/`).catch(()=>{}); 
+}, 25000);
 
 async function start() {
     const { state, saveCreds } = await useMultiFileAuthState(AUTH);
 
     sock = makeWASocket({
-        logger: pino({ level: 'debug' }),
+        logger: pino({ level: 'silent' }), // Less log spam
         auth: state,
-        browser: [BOT_NAME, 'Chrome', '1.0.0'],
-        qrTimeout: 60000 // 60s wait for Render
+        browser: Browsers.macOS('Chrome'), // Looks more real to WA
+        qrTimeout: 40000,
+        printQRInTerminal: false
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -58,18 +64,19 @@ async function start() {
         const { connection, qr, lastDisconnect } = s;
         if (qr) { 
             QR = qr; 
-            console.log('✅ QR READY - Open your Render URL'); 
+            QR_READY = true;
+            console.log('✅ QR IS LIVE NOW. OPEN URL'); 
         }
         if (connection === 'open') {
-            QR = null;
+            QR_READY = false;
             console.log('✅ CONNECTED');
-            await sock.sendMessage(OWNER, { text: `✅ ${BOT_NAME} Online\nOwner Only: ON` });
+            await sock.sendMessage(OWNER, { text: `✅ ${BOT_NAME} Online` });
+            process.exit(0); // Kill to stop QR loop on Render
         }
         if (connection === 'close') {
-            QR = null;
-            const code = lastDisconnect?.error?.output?.statusCode;
-            console.log('Closed:', code);
-            if (code!== DisconnectReason.loggedOut) start();
+            if (lastDisconnect?.error?.output?.statusCode!== DisconnectReason.loggedOut) {
+                start();
+            }
         }
     });
 
@@ -79,16 +86,10 @@ async function start() {
         const from = m.key.remoteJid;
         const text = m.message.conversation || m.message.extendedTextMessage?.text || '';
         
-        if (from!== OWNER) return sock.sendMessage(from, { text: `❌ ${BOT_NAME} is Private. Owner Only.` });
+        if (from!== OWNER) return;
         
-        if (text === '.ping') {
-            const t = Date.now();
-            const x = await sock.sendMessage(from, { text: '🏓 pong...' });
-            await sock.sendMessage(from, { text: `🏓 pong ${Date.now()-t}ms\n⚡ ${BOT_NAME}`, edit: x.key });
-        }
-        if (text === '.menu') {
-            await sock.sendMessage(from, { text: `*⚡ ${BOT_NAME}*\n\n.ping\n.menu\nStatus: ONLINE ✅` });
-        }
+        if (text === '.ping') await sock.sendMessage(from, { text: `🏓 ${Date.now()-m.messageTimestamp*1000}ms` });
+        if (text === '.menu') await sock.sendMessage(from, { text: `*${BOT_NAME}*\n.ping\n.menu` });
     });
 }
 start();
