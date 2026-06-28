@@ -1,0 +1,17 @@
+{
+  "name": "ezed-xmd-v1",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.5",
+    "express": "^4.19.2",
+    "qrcode": "^1.5.4",
+    "pino": "^9.3.2"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}
