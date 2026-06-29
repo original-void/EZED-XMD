@@ -22,13 +22,11 @@ module.exports = {
             });
 
         } catch (err) {
+    console.error(err);
 
-            console.error(err);
-
-            await sock.sendMessage(from, {
-                text: "❌ AI request failed."
-            });
-
+    await sock.sendMessage(from, {
+        text: `❌ Error:\n${err.message}`
+    });
         }
     }
 };
