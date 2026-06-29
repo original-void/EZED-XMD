@@ -26,7 +26,8 @@ module.exports = {
 👑 OWNER
 ➤ .restart
 ➤ .shutdown
-
+➤ .setname
+➤ .setstatus
 ━━━━━━━━━━━━━━━━━━
 
 👥 GROUP
