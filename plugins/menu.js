@@ -20,7 +20,7 @@ module.exports = {
 ➤ .menu
 ➤ .ping
 ➤ .alive
-
+>  .bot
 ━━━━━━━━━━━━━━━━━━
 
 👑 OWNER
