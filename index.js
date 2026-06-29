@@ -1,46 +1,81 @@
+const fs = require("fs");
+const path = require("path");
+
+const plugins = new Map();
+
+const pluginPath = path.join(__dirname, "plugins");
+
+fs.readdirSync(pluginPath).forEach(file => {
+
+    if (!file.endsWith(".js")) return;
+
+    const plugin = require(path.join(pluginPath, file));
+
+    plugins.set(plugin.name.toLowerCase(), plugin);
+
+});
+
+console.log(`Loaded ${plugins.size} plugins.`);
 const {
-  default: makeWASocket,
-  useMultiFileAuthState,
-  DisconnectReason,
-  fetchLatestBaileysVersion
+    default: makeWASocket,
+    useMultiFileAuthState,
+    fetchLatestBaileysVersion,
+    DisconnectReason
 } = require("@whiskeysockets/baileys");
 
 const express = require("express");
-const P = require("pino");
 const QRCode = require("qrcode");
+const P = require("pino");
+const { performance } = require("perf_hooks");
+const config = require("./config");
 
 const app = express();
 
-let qrData = "Loading QR Code...";
+let qrImage = "";
 
-app.get("/", async (req, res) => {
-    if (!qrData.startsWith("data:image")) {
-        return res.send("<h2>QR Code not generated yet. Refresh after a few seconds.</h2>");
+const startTime = Date.now();
+
+function runtime() {
+    const sec = Math.floor((Date.now() - startTime) / 1000);
+
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+
+    return `${h}h ${m}m ${s}s`;
+}
+
+app.get("/", (req, res) => {
+
+    if (!qrImage) {
+        return res.send(`
+        <center>
+        <h1>${config.BOT_NAME}</h1>
+        <h3>Waiting for QR Code...</h3>
+        </center>
+        `);
     }
 
     res.send(`
-    <html>
-    <head>
-        <title>EZED XMD QR</title>
-    </head>
-    <body style="text-align:center;font-family:Arial;background:#111;color:white;">
-        <h1>EZED XMD</h1>
-        <h3>Scan QR Code</h3>
-        <img src="${qrData}" width="300"/>
-    </body>
-    </html>
+    <center>
+        <h1>${config.BOT_NAME}</h1>
+        <img src="${qrImage}" width="300"/>
+        <br>
+        <h3>Scan QR using WhatsApp Linked Devices</h3>
+    </center>
     `);
+
 });
 
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-    console.log(`Server running on ${PORT}`);
+    console.log(`${config.BOT_NAME} Web Server Running`);
 });
 
 async function startBot() {
 
-    const { state, saveCreds } = await useMultiFileAuthState("./auth_info_baileys");
+    const { state, saveCreds } = await useMultiFileAuthState("./session");
 
     const { version } = await fetchLatestBaileysVersion();
 
@@ -53,11 +88,15 @@ async function startBot() {
 
     sock.ev.on("creds.update", saveCreds);
 
-    sock.ev.on("connection.update", async ({ connection, lastDisconnect, qr }) => {
+    sock.ev.on("connection.update", async ({ connection, qr, lastDisconnect }) => {
 
         if (qr) {
-            qrData = await QRCode.toDataURL(qr);
-            console.log("QR Generated");
+            qrImage = await QRCode.toDataURL(qr);
+            console.log("QR Code Generated");
+        }
+
+        if (connection === "open") {
+            console.log(`${config.BOT_NAME} Connected Successfully`);
         }
 
         if (connection === "close") {
@@ -68,10 +107,6 @@ async function startBot() {
             if (shouldReconnect) {
                 startBot();
             }
-
-        } else if (connection === "open") {
-
-            console.log("✅ EZED XMD Connected!");
 
         }
 
@@ -90,17 +125,37 @@ async function startBot() {
             msg.message.extendedTextMessage?.text ||
             "";
 
-        if (body === ".ping") {
-            await sock.sendMessage(from, {
-                text: "🏓 Pong!\nEZED XMD is Online."
-            });
-        }
+        if (!body.startsWith(config.PREFIX)) return;
 
-        if (body === ".alive") {
-            await sock.sendMessage(from, {
-                text: "✅ EZED XMD is Running Successfully."
-            });
-        }
+const args = body.slice(config.PREFIX.length).trim().split(/ +/);
+
+const command = args.shift().toLowerCase();
+
+const plugin = plugins.get(command);
+
+if (!plugin) return;
+
+try {
+
+    await plugin.execute({
+        sock,
+        msg,
+        from,
+        body,
+        args,
+        config,
+        runtime
+    });
+
+} catch (err) {
+
+    console.error(err);
+
+    await sock.sendMessage(from, {
+        text: "❌ An error occurred while executing the command."
+    });
+
+}
 
     });
 
