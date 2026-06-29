@@ -1,25 +1,34 @@
-const Together = require("together-ai");
-const config = require("../config");
-
-const together = new Together({
-    apiKey: config.TOGETHER_API_KEY
-});
-
-async function askAI(prompt) {
-
-    const response = await together.chat.completions.create({
-        model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-        messages: [
-            {
-                role: "user",
-                content: prompt
-            }
-        ]
-    });
-
-    return response.choices[0].message.content;
-}
+const { askAI } = require("../lib/ai");
 
 module.exports = {
-    askAI
+    name: "ai",
+
+    async execute({ sock, from, args }) {
+
+        if (!args.length) {
+            return await sock.sendMessage(from, {
+                text: "Example:\n.ai What is JavaScript?"
+            });
+        }
+
+        const prompt = args.join(" ");
+
+        try {
+
+            const reply = await askAI(prompt);
+
+            await sock.sendMessage(from, {
+                text: `🤖 *EZED XMD AI*\n\n${reply}`
+            });
+
+        } catch (err) {
+
+            console.error(err);
+
+            await sock.sendMessage(from, {
+                text: "❌ AI request failed."
+            });
+
+        }
+    }
 };
