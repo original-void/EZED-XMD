@@ -5,5 +5,6 @@ module.exports = {
     PREFIX: ".",
     VERSION: "1.0.0",
 
-    GEMINI_API_KEY: "YOUR_GEMINI_API_KEY"
+    // Together AI API
+    TOGETHER_API_KEY: "leekOeO7HJToWQZ9jXlHXj596KAaEet8"
 };
