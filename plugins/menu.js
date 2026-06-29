@@ -67,6 +67,10 @@ module.exports = {
 ➤ .antidelete
 ➤ .welcome
 
+💡 TOOLS
+➤ .quote
+➤ .calc
+➤ .help
 ━━━━━━━━━━━━━━━━━━
 
 💻 Powered by
