@@ -5,6 +5,5 @@ module.exports = {
     PREFIX: ".",
     VERSION: "1.0.0",
 
-    // Together AI API
-    TOGETHER_API_KEY: "leekOeO7HJToWQZ9jXlHXj596KAaEet8"
+    MISTRAL_API_KEY: "leekOeO7HJToWQZ9jXlHXj596KAaEet8"
 };
