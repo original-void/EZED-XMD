@@ -6,15 +6,6 @@
   "scripts": {
     "start": "node index.js"
   },
-  "keywords": [
-    "whatsapp",
-    "bot",
-    "baileys",
-    "ezed",
-    "xmd"
-  ],
-  "author": "EZED X TECH",
-  "license": "MIT",
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.5",
     "express": "^4.19.2",
