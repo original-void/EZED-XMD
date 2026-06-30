@@ -111,7 +111,29 @@ async function startBot() {
         }
 
     });
+const { loadDB } = require("./lib/database");
 
+const db = loadDB();
+
+if (
+    from.endsWith("@g.us") &&
+    db.groups[from]?.antilink
+) {
+
+    if (
+        body.includes("https://") ||
+        body.includes("http://") ||
+        body.includes("chat.whatsapp.com")
+    ) {
+
+        await sock.sendMessage(from,{
+            text:"🚫 Links are not allowed in this group."
+        });
+
+        return;
+    }
+
+}
     sock.ev.on("messages.upsert", async ({ messages }) => {
 
         const msg = messages[0];
