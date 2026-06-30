@@ -1,17 +1,23 @@
 module.exports = {
+
     name: "alive",
 
-    async execute({ sock, from, config, runtime }) {
+    async execute({ sock, from }) {
 
         await sock.sendMessage(from, {
-            text: `🤖 ${config.BOT_NAME}
 
-✅ Bot is Running
+            text:
+`🤖 EZED XMD
 
-👤 Owner : ${config.OWNER_NAME}
-⏱ Runtime : ${runtime()}
-🚀 Version : ${config.VERSION}`
+✅ Bot is Alive
+
+🚀 Running Successfully
+
+Developer:
+EZED X TECH`
+
         });
 
     }
+
 };
