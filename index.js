@@ -88,29 +88,24 @@ async function startBot() {
 
     sock.ev.on("creds.update", saveCreds);
 
-    sock.ev.on("connection.update", async ({ connection, qr, lastDisconnect }) => {
+    sock.ev.on("connection.update", async (update) => {
+    console.log(update);
 
-        if (qr) {
-            qrImage = await QRCode.toDataURL(qr);
-            console.log("QR Code Generated");
-        }
+    const { connection, qr, lastDisconnect } = update;
 
-        if (connection === "open") {
-            console.log(`${config.BOT_NAME} Connected Successfully`);
-        }
+    if (qr) {
+        console.log("QR RECEIVED");
+        qrImage = await QRCode.toDataURL(qr);
+    }
 
-        if (connection === "close") {
+    if (connection === "open") {
+        console.log("CONNECTED");
+    }
 
-            const shouldReconnect =
-                lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-
-            if (shouldReconnect) {
-                startBot();
-            }
-
-        }
-
-    });
+    if (connection === "close") {
+        console.log("DISCONNECTED", lastDisconnect);
+    }
+});
 
     sock.ev.on("messages.upsert", async ({ messages }) => {
 
