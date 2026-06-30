@@ -4,78 +4,119 @@ module.exports = {
     async execute({ sock, from, config, runtime }) {
 
         const menu = `
-╭━━━━━━━━━━━━━━━━━━━⬣
-┃      🤖 *EZED XMD*
-╰━━━━━━━━━━━━━━━━━━━⬣
+╭━━━━━━━━━━━━━━━━━━━━━━━
+┃ 🤖 *${config.BOT_NAME}*
+┃ 🚀 Version: ${config.VERSION}
+╰━━━━━━━━━━━━━━━━━━━━━━━
 
-👤 Owner : ${config.OWNER_NAME}
-📱 Number : ${config.OWNER_NUMBER}
-⚡ Prefix : ${config.PREFIX}
-🚀 Version : ${config.VERSION}
-⏱ Runtime : ${runtime()}
+👑 Owner: ${config.OWNER_NAME}
+📱 Number: ${config.OWNER_NUMBER}
+⚡ Prefix: ${config.PREFIX}
+⏱ Runtime: ${runtime()}
 
-━━━━━━━━━━━━━━━━━━
-
+━━━━━━━━━━━━━━━━━━━━━━━
 📋 GENERAL
+━━━━━━━━━━━━━━━━━━━━━━━
 ➤ .menu
 ➤ .ping
 ➤ .alive
->  .bot
-━━━━━━━━━━━━━━━━━━
+➤ .bot
+➤ .runtime
+➤ .owner
+➤ .help
+➤ .listcmd
+➤ .date
+➤ .time
+➤ .quote
+➤ .calc
+➤ .weather
 
-👑 OWNER
-➤ .restart
-➤ .shutdown
-➤ .setname
-➤ .setstatus
-━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━
+🤖 AI COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━
+➤ .ai
+➤ .translate
+➤ .summarize
+➤ .code
+➤ .fixcode
+➤ .debug
+➤ .explain
 
-👥 GROUP
+━━━━━━━━━━━━━━━━━━━━━━━
+👥 GROUP COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━
 ➤ .kick
 ➤ .add
 ➤ .promote
 ➤ .demote
 ➤ .tagall
 ➤ .hidetag
+➤ .tagadmins
 
-━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━
+🛡️ SECURITY
+━━━━━━━━━━━━━━━━━━━━━━━
+➤ .welcome on/off
+➤ .antilink on/off
+➤ .antidelete on/off
+➤ .antispam on/off
 
-🎨 STICKERS
+━━━━━━━━━━━━━━━━━━━━━━━
+🎨 STICKER
+━━━━━━━━━━━━━━━━━━━━━━━
 ➤ .sticker
 ➤ .take
+➤ .toimg
+➤ .tomp3
+➤ .tovideo
 
-━━━━━━━━━━━━━━━━━━
-
-⬇️ DOWNLOAD
+━━━━━━━━━━━━━━━━━━━━━━━
+📥 DOWNLOAD
+━━━━━━━━━━━━━━━━━━━━━━━
 ➤ .play
+➤ .song
+➤ .video
 ➤ .ytmp3
 ➤ .ytmp4
 ➤ .tiktok
 ➤ .facebook
+➤ .instagram
 
-━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━
+👑 OWNER
+━━━━━━━━━━━━━━━━━━━━━━━
+➤ .restart
+➤ .shutdown
+➤ .setname
+➤ .setstatus
+➤ .setprefix
+➤ .broadcast
+➤ .block
+➤ .unblock
 
-🤖 AI
-➤ .ai
-➤ .gpt
-➤ .imagine
+━━━━━━━━━━━━━━━━━━━━━━━
+🎮 FUN
+━━━━━━━━━━━━━━━━━━━━━━━
+➤ .truth
+➤ .dare
+➤ .joke
+➤ .8ball
+➤ .ship
+➤ .meme
 
-━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━
+⚙️ SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━
+➤ .stats
+➤ .backup
+➤ .update
+➤ .plugins
 
-🛡️ SECURITY
-➤ .antilink
-➤ .antidelete
-➤ .welcome
-
-💡 TOOLS
-➤ .quote
-➤ .calc
-➤ .help
-━━━━━━━━━━━━━━━━━━
-
-💻 Powered by
-EZED X TECH
-`;
+━━━━━━━━━━━━━━━━━━━━━━━
+💻 Powered By
+🚀 EZED X TECH
+🤖 EZED XMD
+━━━━━━━━━━━━━━━━━━━━━━━`;
 
         await sock.sendMessage(from, {
             text: menu
