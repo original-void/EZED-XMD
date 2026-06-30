@@ -130,7 +130,29 @@ async function startBot() {
 const args = body.slice(config.PREFIX.length).trim().split(/ +/);
 
 const command = args.shift().toLowerCase();
+const { loadDB } = require("./lib/database");
 
+const db = loadDB();
+
+if (
+    from.endsWith("@g.us") &&
+    db.groups[from]?.antilink
+) {
+
+    if (
+        body.includes("https://") ||
+        body.includes("http://") ||
+        body.includes("chat.whatsapp.com")
+    ) {
+
+        await sock.sendMessage(from,{
+            text:"🚫 Links are not allowed in this group."
+        });
+
+        return;
+    }
+
+}
 const plugin = plugins.get(command);
 
 if (!plugin) return;
