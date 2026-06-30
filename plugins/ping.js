@@ -1,23 +1,34 @@
 module.exports = {
+
     name: "ping",
-    description: "Check bot speed",
 
-    async execute({ sock, from, config, runtime }) {
-        const { performance } = require("perf_hooks");
+    async execute({ sock, from }) {
 
-        const start = performance.now();
-        const end = performance.now();
+        const start = Date.now();
 
-        const speed = (end - start).toFixed(2);
+        const speed = Date.now() - start;
+
+        const uptime = process.uptime();
+
+        const hours = Math.floor(uptime / 3600);
+
+        const minutes = Math.floor((uptime % 3600) / 60);
+
+        const seconds = Math.floor(uptime % 60);
 
         await sock.sendMessage(from, {
-            text: `╭━━〔 ⚡ ${config.BOT_NAME} ⚡ 〕━━⬣
 
-🤖 Status : Online ✅
+            text:
+`🏓 *PONG!*
+
 ⚡ Speed : ${speed} ms
-⏱ Runtime : ${runtime()}
 
-╰━━━━━━━━━━━━━━━━━━⬣`
+🟢 Status : Online
+
+⏳ Uptime : ${hours}h ${minutes}m ${seconds}s`
+
         });
+
     }
+
 };
