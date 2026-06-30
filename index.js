@@ -9,6 +9,10 @@ const {
 
 const app = express();
 
+// ==========================
+// Home Page
+// ==========================
+
 app.get("/", (req, res) => {
 
     const qr = getQR();
@@ -17,10 +21,10 @@ app.get("/", (req, res) => {
 
     res.send(`
 <!DOCTYPE html>
-
 <html>
-
 <head>
+
+<meta charset="UTF-8">
 
 <meta http-equiv="refresh" content="3">
 
@@ -30,15 +34,15 @@ app.get("/", (req, res) => {
 
 body{
 
-background:#111b21;
-
-color:white;
+background:#111B21;
 
 font-family:Arial;
 
 text-align:center;
 
-padding-top:50px;
+color:white;
+
+margin-top:50px;
 
 }
 
@@ -46,17 +50,27 @@ padding-top:50px;
 
 display:inline-block;
 
-background:#202c33;
+background:#202C33;
 
 padding:30px;
 
-border-radius:15px;
+border-radius:20px;
+
+box-shadow:0px 0px 20px rgba(0,255,0,.2);
 
 }
 
 img{
 
 width:300px;
+
+border-radius:15px;
+
+}
+
+h1{
+
+color:#00ff88;
 
 }
 
@@ -73,14 +87,28 @@ width:300px;
 ${
 connected
 ?
-"<h2>🟢 WhatsApp Connected</h2>"
+`
+<h2>🟢 WhatsApp Connected</h2>
+
+<p>Bot is running successfully.</p>
+`
 :
 (
 qr
 ?
-`<img src="${qr}"><br><br><b>Scan QR Using Linked Devices</b>`
+`
+<img src="${qr}"/>
+
+<br><br>
+
+<b>Scan this QR using WhatsApp Linked Devices</b>
+`
 :
-"<h2>⌛ Waiting For QR...</h2>"
+`
+<h2>⌛ Waiting For QR Code...</h2>
+
+<p>Refreshing every 3 seconds...</p>
+`
 )
 }
 
@@ -93,12 +121,38 @@ qr
 
 });
 
-const PORT = process.env.PORT || 3000;
+// ==========================
+// Health Check
+// ==========================
 
-app.listen(PORT, () => {
+app.get("/status",(req,res)=>{
 
-    console.log("Web Server Running On Port", PORT);
+res.json({
+
+bot:config.BOT_NAME,
+
+connected:isConnected(),
+
+uptime:process.uptime()
 
 });
 
-startBot();
+});
+
+// ==========================
+// Start Server
+// ==========================
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT,()=>{
+
+console.log(`🌍 Server Running On ${PORT}`);
+
+});
+
+// ==========================
+// Start WhatsApp
+// ==========================
+
+startBot().catch(console.error);
