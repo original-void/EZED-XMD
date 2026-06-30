@@ -12,81 +12,99 @@ const {
     DisconnectReason
 } = require("@whiskeysockets/baileys");
 
-// =========================
+// ==========================
 // Load Plugins
-// =========================
+// ==========================
 
 const plugins = new Map();
 
-const pluginPath = path.join(__dirname, "plugins");
+const pluginDir = path.join(__dirname, "plugins");
 
-if (fs.existsSync(pluginPath)) {
-    fs.readdirSync(pluginPath).forEach(file => {
+if (fs.existsSync(pluginDir)) {
 
-        if (!file.endsWith(".js")) return;
+    for (const file of fs.readdirSync(pluginDir)) {
+
+        if (!file.endsWith(".js")) continue;
 
         try {
 
-            const plugin = require(path.join(pluginPath, file));
+            const plugin = require(path.join(pluginDir, file));
 
             plugins.set(plugin.name.toLowerCase(), plugin);
 
-            console.log(`✔ Loaded ${plugin.name}`);
+            console.log("Loaded:", plugin.name);
 
         } catch (err) {
 
-            console.log(`✖ Failed loading ${file}`);
+            console.log("Plugin Error:", file);
+
             console.error(err);
 
         }
 
-    });
+    }
+
 }
 
-console.log(`✅ ${plugins.size} plugins loaded.`);
+console.log(`${plugins.size} plugins loaded.`);
 
-// =========================
-// Express Web Server
-// =========================
+// ==========================
+// Web Server
+// ==========================
 
 const app = express();
 
 let qrImage = null;
-let botConnected = false;
+let connected = false;
 
 app.get("/", (req, res) => {
 
     res.send(`
 <!DOCTYPE html>
+
 <html>
+
 <head>
+
+<meta charset="UTF-8">
+
+<meta http-equiv="refresh" content="5">
+
 <title>${config.BOT_NAME}</title>
 
 <style>
 
 body{
 
-background:#0b141a;
+background:#0B141A;
+
 color:white;
+
 font-family:Arial;
+
 text-align:center;
+
 padding-top:40px;
+
+}
+
+.card{
+
+background:#202C33;
+
+display:inline-block;
+
+padding:25px;
+
+border-radius:15px;
 
 }
 
 img{
 
 width:300px;
-border-radius:15px;
 
-}
-
-.card{
-
-background:#1f2c34;
-padding:30px;
-display:inline-block;
-border-radius:20px;
+border-radius:10px;
 
 }
 
@@ -101,17 +119,16 @@ border-radius:20px;
 <h1>${config.BOT_NAME}</h1>
 
 ${
-botConnected
+connected
 ?
-"<h2>🟢 Bot Connected Successfully</h2>"
+"<h2>🟢 Connected Successfully</h2>"
 :
 (
 qrImage
 ?
-`<img src="${qrImage}"><br><br>
-<h3>Scan this QR using WhatsApp Linked Devices</h3>`
+`<img src="${qrImage}"><br><br><b>Scan this QR using Linked Devices</b>`
 :
-"<h3>Generating QR Code...</h3>"
+"<h2>⌛ Waiting for QR Code...</h2>"
 )
 }
 
@@ -121,26 +138,22 @@ qrImage
 
 </html>
 `);
-
-});
-
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-
-    console.log(`🌐 Web running on ${PORT}`);
-
-});// =========================
-// Start WhatsApp Bot
-// =========================
+// ==========================
+// Start WhatsApp
+// ==========================
 
 async function startBot() {
 
+    const sessionPath = path.join(__dirname, "session");
+
     const { state, saveCreds } =
-        await useMultiFileAuthState("./session");
+        await useMultiFileAuthState(sessionPath);
 
     const { version } =
         await fetchLatestBaileysVersion();
+
+    console.log("🚀 Starting WhatsApp...");
+    console.log("Using Baileys Version:", version);
 
     const sock = makeWASocket({
 
@@ -148,28 +161,31 @@ async function startBot() {
 
         auth: state,
 
+        printQRInTerminal: true,
+
         logger: P({
             level: "silent"
         }),
 
-        printQRInTerminal: true,
-
         browser: [
-            "EZED XMD",
+            config.BOT_NAME,
             "Chrome",
             "1.0.0"
         ]
 
     });
 
-    // Save Session
+    global.sock = sock;
+
     sock.ev.on("creds.update", saveCreds);
 
-    // =========================
-    // Connection Update
-    // =========================
+    // ==========================
+    // Connection Updates
+    // ==========================
 
     sock.ev.on("connection.update", async (update) => {
+
+        console.log("Connection Update:", update);
 
         const {
             connection,
@@ -177,44 +193,48 @@ async function startBot() {
             qr
         } = update;
 
-        // Generate QR
+        // QR RECEIVED
         if (qr) {
 
-            console.log("✅ QR Code Generated");
+            console.log("✅ QR RECEIVED");
 
             qrImage = await QRCode.toDataURL(qr);
 
-            botConnected = false;
+            connected = false;
 
         }
 
-        // Connected
+        // CONNECTED
         if (connection === "open") {
 
             console.log("🟢 WhatsApp Connected");
 
-            botConnected = true;
+            connected = true;
 
             qrImage = null;
 
         }
 
-        // Disconnected
+        // DISCONNECTED
         if (connection === "close") {
 
-            botConnected = false;
+            connected = false;
+
+            console.log("🔴 Connection Closed");
 
             const shouldReconnect =
                 lastDisconnect?.error?.output?.statusCode !==
                 DisconnectReason.loggedOut;
 
-            console.log("🔴 Connection Closed");
-
             if (shouldReconnect) {
 
-                console.log("♻ Reconnecting...");
+                console.log("♻ Reconnecting in 3 seconds...");
 
-                startBot();
+                setTimeout(() => {
+
+                    startBot();
+
+                }, 3000);
 
             } else {
 
@@ -226,21 +246,24 @@ async function startBot() {
 
     });
 
-    // Make socket available globally
-    global.sock = sock;
-
-    // Continue with message handler below...    // =========================
+    // ==========================
     // Messages
-    // =========================
+    // ==========================
+});
 
-    sock.ev.on("messages.upsert", async ({ messages }) => {
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+
+console.log("Web running on", PORT);
+
+});    sock.ev.on("messages.upsert", async ({ messages }) => {
 
         try {
 
             const msg = messages[0];
 
             if (!msg.message) return;
-
             if (msg.key.fromMe) return;
 
             const from = msg.key.remoteJid;
@@ -261,48 +284,64 @@ async function startBot() {
 
             const command = args.shift().toLowerCase();
 
-            // =========================
-            // Database
-            // =========================
+            // ==========================
+            // Load Database
+            // ==========================
 
             const { loadDB } = require("./lib/database");
 
             const db = loadDB();
 
-            // =========================
-            // Anti-Link
-            // =========================
+            // Create group entry if missing
+            if (from.endsWith("@g.us")) {
 
-            if (
-                from.endsWith("@g.us") &&
-                db.groups[from]?.antilink
-            ) {
+                if (!db.groups[from]) {
 
-                if (
-                    body.includes("https://") ||
-                    body.includes("http://") ||
-                    body.includes("chat.whatsapp.com")
-                ) {
+                    db.groups[from] = {
+                        welcome: false,
+                        antilink: false,
+                        antidelete: false
+                    };
 
-                    await sock.sendMessage(from, {
-                        text: "🚫 Links are not allowed in this group."
-                    });
-
-                    return;
                 }
 
             }
 
-            // =========================
-            // Plugin Loader
-            // =========================
+            // ==========================
+            // Anti-Link
+            // ==========================
+
+            if (
+                from.endsWith("@g.us") &&
+                db.groups[from].antilink
+            ) {
+
+                if (
+                    body.includes("chat.whatsapp.com") ||
+                    body.includes("http://") ||
+                    body.includes("https://")
+                ) {
+
+                    await sock.sendMessage(from, {
+                        text: "🚫 Links are not allowed."
+                    });
+
+                    return;
+
+                }
+
+            }
+
+            // ==========================
+            // Execute Plugin
+            // ==========================
 
             const plugin = plugins.get(command);
 
             if (!plugin) {
 
                 return await sock.sendMessage(from, {
-                    text: `❌ Command *${command}* not found.\n\nType *.menu*`
+                    text: `❌ Unknown command: ${command}\n\nType *.menu*`
                 });
 
             }
@@ -316,7 +355,7 @@ async function startBot() {
                 args,
                 config,
 
-                runtime: () => {
+                runtime() {
 
                     const sec = Math.floor(process.uptime());
 
@@ -340,10 +379,43 @@ async function startBot() {
 
     });
 
-}
-
-// =========================
+}// ==========================
 // Start Bot
-// =========================
+// ==========================
 
-startBot();
+startBot()
+.catch(err => {
+
+    console.error("Bot Failed To Start");
+
+    console.error(err);
+
+});
+
+// ==========================
+// Auto Reload Plugins (Optional)
+// ==========================
+
+fs.watch(path.join(__dirname, "plugins"), (event, file) => {
+
+    if (!file || !file.endsWith(".js")) return;
+
+    try {
+
+        delete require.cache[
+            require.resolve(path.join(__dirname, "plugins", file))
+        ];
+
+        const plugin = require(path.join(__dirname, "plugins", file));
+
+        plugins.set(plugin.name.toLowerCase(), plugin);
+
+        console.log(`🔄 Reloaded Plugin: ${plugin.name}`);
+
+    } catch (err) {
+
+        console.error(err);
+
+    }
+
+});
