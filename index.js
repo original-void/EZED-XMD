@@ -1,21 +1,10 @@
 const fs = require("fs");
 const path = require("path");
+const express = require("express");
+const QRCode = require("qrcode");
+const P = require("pino");
+const config = require("./config");
 
-const plugins = new Map();
-
-const pluginPath = path.join(__dirname, "plugins");
-
-fs.readdirSync(pluginPath).forEach(file => {
-
-    if (!file.endsWith(".js")) return;
-
-    const plugin = require(path.join(pluginPath, file));
-
-    plugins.set(plugin.name.toLowerCase(), plugin);
-
-});
-
-console.log(`Loaded ${plugins.size} plugins.`);
 const {
     default: makeWASocket,
     useMultiFileAuthState,
@@ -23,159 +12,338 @@ const {
     DisconnectReason
 } = require("@whiskeysockets/baileys");
 
-const express = require("express");
-const QRCode = require("qrcode");
-const P = require("pino");
-const { performance } = require("perf_hooks");
-const config = require("./config");
+// =========================
+// Load Plugins
+// =========================
+
+const plugins = new Map();
+
+const pluginPath = path.join(__dirname, "plugins");
+
+if (fs.existsSync(pluginPath)) {
+    fs.readdirSync(pluginPath).forEach(file => {
+
+        if (!file.endsWith(".js")) return;
+
+        try {
+
+            const plugin = require(path.join(pluginPath, file));
+
+            plugins.set(plugin.name.toLowerCase(), plugin);
+
+            console.log(`✔ Loaded ${plugin.name}`);
+
+        } catch (err) {
+
+            console.log(`✖ Failed loading ${file}`);
+            console.error(err);
+
+        }
+
+    });
+}
+
+console.log(`✅ ${plugins.size} plugins loaded.`);
+
+// =========================
+// Express Web Server
+// =========================
 
 const app = express();
 
-let qrImage = "";
-
-const startTime = Date.now();
-
-function runtime() {
-    const sec = Math.floor((Date.now() - startTime) / 1000);
-
-    const h = Math.floor(sec / 3600);
-    const m = Math.floor((sec % 3600) / 60);
-    const s = sec % 60;
-
-    return `${h}h ${m}m ${s}s`;
-}
+let qrImage = null;
+let botConnected = false;
 
 app.get("/", (req, res) => {
 
-    if (!qrImage) {
-        return res.send(`
-        <center>
-        <h1>${config.BOT_NAME}</h1>
-        <h3>Waiting for QR Code...</h3>
-        </center>
-        `);
-    }
-
     res.send(`
-    <center>
-        <h1>${config.BOT_NAME}</h1>
-        <img src="${qrImage}" width="300"/>
-        <br>
-        <h3>Scan QR using WhatsApp Linked Devices</h3>
-    </center>
-    `);
+<!DOCTYPE html>
+<html>
+<head>
+<title>${config.BOT_NAME}</title>
+
+<style>
+
+body{
+
+background:#0b141a;
+color:white;
+font-family:Arial;
+text-align:center;
+padding-top:40px;
+
+}
+
+img{
+
+width:300px;
+border-radius:15px;
+
+}
+
+.card{
+
+background:#1f2c34;
+padding:30px;
+display:inline-block;
+border-radius:20px;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+<h1>${config.BOT_NAME}</h1>
+
+${
+botConnected
+?
+"<h2>🟢 Bot Connected Successfully</h2>"
+:
+(
+qrImage
+?
+`<img src="${qrImage}"><br><br>
+<h3>Scan this QR using WhatsApp Linked Devices</h3>`
+:
+"<h3>Generating QR Code...</h3>"
+)
+}
+
+</div>
+
+</body>
+
+</html>
+`);
 
 });
 
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-    console.log(`${config.BOT_NAME} Web Server Running`);
-});
+
+    console.log(`🌐 Web running on ${PORT}`);
+
+});// =========================
+// Start WhatsApp Bot
+// =========================
 
 async function startBot() {
 
-    const { state, saveCreds } = await useMultiFileAuthState("./session");
+    const { state, saveCreds } =
+        await useMultiFileAuthState("./session");
 
-    const { version } = await fetchLatestBaileysVersion();
+    const { version } =
+        await fetchLatestBaileysVersion();
 
     const sock = makeWASocket({
+
         version,
+
         auth: state,
-        logger: P({ level: "silent" }),
-        printQRInTerminal: true
+
+        logger: P({
+            level: "silent"
+        }),
+
+        printQRInTerminal: true,
+
+        browser: [
+            "EZED XMD",
+            "Chrome",
+            "1.0.0"
+        ]
+
     });
 
+    // Save Session
     sock.ev.on("creds.update", saveCreds);
 
+    // =========================
+    // Connection Update
+    // =========================
+
     sock.ev.on("connection.update", async (update) => {
-    console.log(update);
 
-    const { connection, qr, lastDisconnect } = update;
+        const {
+            connection,
+            lastDisconnect,
+            qr
+        } = update;
 
-    if (qr) {
-        console.log("QR RECEIVED");
-        qrImage = await QRCode.toDataURL(qr);
-    }
+        // Generate QR
+        if (qr) {
 
-    if (connection === "open") {
-        console.log("CONNECTED");
-    }
+            console.log("✅ QR Code Generated");
 
-    if (connection === "close") {
-        console.log("DISCONNECTED", lastDisconnect);
-    }
-});
+            qrImage = await QRCode.toDataURL(qr);
+
+            botConnected = false;
+
+        }
+
+        // Connected
+        if (connection === "open") {
+
+            console.log("🟢 WhatsApp Connected");
+
+            botConnected = true;
+
+            qrImage = null;
+
+        }
+
+        // Disconnected
+        if (connection === "close") {
+
+            botConnected = false;
+
+            const shouldReconnect =
+                lastDisconnect?.error?.output?.statusCode !==
+                DisconnectReason.loggedOut;
+
+            console.log("🔴 Connection Closed");
+
+            if (shouldReconnect) {
+
+                console.log("♻ Reconnecting...");
+
+                startBot();
+
+            } else {
+
+                console.log("❌ Logged Out");
+
+            }
+
+        }
+
+    });
+
+    // Make socket available globally
+    global.sock = sock;
+
+    // Continue with message handler below...    // =========================
+    // Messages
+    // =========================
 
     sock.ev.on("messages.upsert", async ({ messages }) => {
 
-        const msg = messages[0];
+        try {
 
-        if (!msg.message) return;
+            const msg = messages[0];
 
-        const from = msg.key.remoteJid;
+            if (!msg.message) return;
 
-        const body =
-            msg.message.conversation ||
-            msg.message.extendedTextMessage?.text ||
-            "";
+            if (msg.key.fromMe) return;
 
-        if (!body.startsWith(config.PREFIX)) return;
+            const from = msg.key.remoteJid;
 
-const args = body.slice(config.PREFIX.length).trim().split(/ +/);
+            const body =
+                msg.message.conversation ||
+                msg.message.extendedTextMessage?.text ||
+                msg.message.imageMessage?.caption ||
+                msg.message.videoMessage?.caption ||
+                "";
 
-const command = args.shift().toLowerCase();
-const { loadDB } = require("./lib/database");
+            if (!body.startsWith(config.PREFIX)) return;
 
-const db = loadDB();
+            const args = body
+                .slice(config.PREFIX.length)
+                .trim()
+                .split(/ +/);
 
-if (
-    from.endsWith("@g.us") &&
-    db.groups[from]?.antilink
-) {
+            const command = args.shift().toLowerCase();
 
-    if (
-        body.includes("https://") ||
-        body.includes("http://") ||
-        body.includes("chat.whatsapp.com")
-    ) {
+            // =========================
+            // Database
+            // =========================
 
-        await sock.sendMessage(from,{
-            text:"🚫 Links are not allowed in this group."
-        });
+            const { loadDB } = require("./lib/database");
 
-        return;
-    }
+            const db = loadDB();
 
-}
-const plugin = plugins.get(command);
+            // =========================
+            // Anti-Link
+            // =========================
 
-if (!plugin) return;
+            if (
+                from.endsWith("@g.us") &&
+                db.groups[from]?.antilink
+            ) {
 
-try {
+                if (
+                    body.includes("https://") ||
+                    body.includes("http://") ||
+                    body.includes("chat.whatsapp.com")
+                ) {
 
-    await plugin.execute({
-        sock,
-        msg,
-        from,
-        body,
-        args,
-        config,
-        runtime
+                    await sock.sendMessage(from, {
+                        text: "🚫 Links are not allowed in this group."
+                    });
+
+                    return;
+                }
+
+            }
+
+            // =========================
+            // Plugin Loader
+            // =========================
+
+            const plugin = plugins.get(command);
+
+            if (!plugin) {
+
+                return await sock.sendMessage(from, {
+                    text: `❌ Command *${command}* not found.\n\nType *.menu*`
+                });
+
+            }
+
+            await plugin.execute({
+
+                sock,
+                msg,
+                from,
+                body,
+                args,
+                config,
+
+                runtime: () => {
+
+                    const sec = Math.floor(process.uptime());
+
+                    const h = Math.floor(sec / 3600);
+
+                    const m = Math.floor((sec % 3600) / 60);
+
+                    const s = sec % 60;
+
+                    return `${h}h ${m}m ${s}s`;
+
+                }
+
+            });
+
+        } catch (err) {
+
+            console.error(err);
+
+        }
+
     });
 
-} catch (err) {
-
-    console.error(err);
-
-    await sock.sendMessage(from, {
-        text: "❌ An error occurred while executing the command."
-    });
-
 }
 
-    });
-
-}
+// =========================
+// Start Bot
+// =========================
 
 startBot();
